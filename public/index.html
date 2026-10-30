@@ -1,0 +1,1036 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Daily Pulse — Habit & AI Coach</title>
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/icon.png">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      -webkit-tap-highlight-color: transparent;
+    }
+    @keyframes pulseGlow {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.35); }
+      50% { box-shadow: 0 0 14px 3px rgba(16, 185, 129, 0.25); }
+    }
+    .active-session-glow {
+      animation: pulseGlow 2s infinite;
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col justify-between p-3.5 font-sans antialiased max-w-md mx-auto">
+
+  <!-- Header with Live 12-Hour Clock & Sound Mute Toggle -->
+  <header class="pt-0.5 pb-2">
+    <div class="flex items-center justify-between">
+      <div>
+        <div class="flex items-center gap-2">
+          <h1 class="text-xl font-bold tracking-tight text-white">Daily Pulse</h1>
+          <button
+            id="sound-toggle-btn"
+            onclick="toggleSound()"
+            class="text-xs px-2 py-0.5 rounded-full bg-slate-900 border border-slate-800 text-slate-300 hover:border-slate-700 transition"
+            title="Toggle UI Sound Effects"
+          >
+            🔊 SFX
+          </button>
+        </div>
+        <p id="current-date" class="text-[11px] text-slate-400 mt-0.5">Loading date...</p>
+      </div>
+
+      <!-- Live Running 12-Hour IST Clock -->
+      <div class="text-right">
+        <div
+          id="live-clock"
+          class="text-sm font-mono font-bold text-emerald-400 bg-emerald-950/30 border border-emerald-500/30 px-2.5 py-1 rounded-lg tracking-wider"
+        >
+          --:--:-- --
+        </div>
+        <span class="text-[10px] text-slate-500 block mt-0.5">IST (12-Hr Live)</span>
+      </div>
+    </div>
+
+    <!-- Smart Note Box + AI Auto-Logger + 12-Hour AM/PM Late Picker -->
+    <div class="mt-2.5 bg-slate-900/90 border border-slate-800 rounded-xl p-2.5 space-y-2">
+      <div class="flex gap-1.5">
+        <input
+          id="habit-note"
+          type="text"
+          placeholder="Note OR 'Tuition ended at 8:15 pm'..."
+          class="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+        />
+        <button
+          onclick="smartAiLog(this)"
+          class="bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white text-xs font-semibold px-2.5 py-2 rounded-lg whitespace-nowrap transition shadow"
+        >
+          ✨ AI Log
+        </button>
+      </div>
+
+      <!-- True 12-Hour AM/PM Selector for Missed / Late Events -->
+      <div class="flex items-center justify-between text-[11px] text-slate-400 pt-1.5 border-t border-slate-800/80">
+        <span>⏰ Late log? Actual 12h time:</span>
+        <div class="flex items-center gap-1">
+          <select id="late-hour" class="bg-slate-950 border border-slate-700 rounded px-1.5 py-0.5 text-[11px] text-amber-300 focus:outline-none">
+            <option value="">Hr</option>
+            <option value="01">01</option>
+            <option value="02">02</option>
+            <option value="03">03</option>
+            <option value="04">04</option>
+            <option value="05">05</option>
+            <option value="06">06</option>
+            <option value="07">07</option>
+            <option value="08">08</option>
+            <option value="09">09</option>
+            <option value="10">10</option>
+            <option value="11">11</option>
+            <option value="12">12</option>
+          </select>
+          <span>:</span>
+          <select id="late-min" class="bg-slate-950 border border-slate-700 rounded px-1.5 py-0.5 text-[11px] text-amber-300 focus:outline-none">
+            <option value="00">00</option>
+            <option value="05">05</option>
+            <option value="10">10</option>
+            <option value="15">15</option>
+            <option value="20">20</option>
+            <option value="25">25</option>
+            <option value="30">30</option>
+            <option value="35">35</option>
+            <option value="40">40</option>
+            <option value="45">45</option>
+            <option value="50">50</option>
+            <option value="55">55</option>
+          </select>
+          <select id="late-ampm" class="bg-slate-950 border border-slate-700 rounded px-1.5 py-0.5 text-[11px] text-amber-300 font-semibold focus:outline-none">
+            <option value="AM">AM</option>
+            <option value="PM" selected>PM</option>
+          </select>
+          <button
+            onclick="clearLateTime()"
+            class="text-[10px] text-slate-500 hover:text-slate-300 px-1"
+            title="Clear custom time"
+          >
+            ✕
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Status Toast -->
+    <div id="status-box" class="mt-2 min-h-[34px] rounded-lg bg-slate-900/60 border border-slate-800/80 px-2.5 py-1.5 flex items-center justify-center text-[11px] text-slate-400 text-center transition-all">
+      Tap tile = ▶ Start (Chime) / ⏹ End (Chord) • "✔ Done" = Instant
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="flex-1 flex flex-col gap-2.5 my-1">
+
+    <!-- 1. Top 3-Column Row: Wake Up, Meal, Sleep -->
+    <div class="grid grid-cols-3 gap-2">
+      <button
+        onclick="triggerInstantHabit('/wakeup', 'Woke Up', this)"
+        class="bg-slate-900 hover:bg-slate-800 active:scale-95 border border-amber-500/30 rounded-xl p-2.5 text-center flex flex-col items-center justify-center gap-0.5 shadow transition"
+      >
+        <span class="text-lg">☀️</span>
+        <span class="text-xs font-semibold text-white">Wake Up</span>
+      </button>
+
+      <button
+        onclick="triggerInstantHabit('/meal', 'Logged Meal', this)"
+        class="bg-slate-900 hover:bg-slate-800 active:scale-95 border border-emerald-500/30 rounded-xl p-2.5 text-center flex flex-col items-center justify-center gap-0.5 shadow transition"
+      >
+        <span class="text-lg">🍲</span>
+        <span class="text-xs font-semibold text-white">Meal</span>
+      </button>
+
+      <button
+        onclick="triggerInstantHabit('/sleep', 'Shutting Down', this)"
+        class="bg-slate-900 hover:bg-slate-800 active:scale-95 border border-purple-500/30 rounded-xl p-2.5 text-center flex flex-col items-center justify-center gap-0.5 shadow transition"
+      >
+        <span class="text-lg">🌙</span>
+        <span class="text-xs font-semibold text-white">Sleep</span>
+      </button>
+    </div>
+
+    <!-- 2. Compact 2-Column Grid for the 6 Session Trackers -->
+    <div class="grid grid-cols-2 gap-2">
+
+      <!-- Tile 1: Tuition (/tuition) -->
+      <div id="card-/tuition" class="bg-slate-900 border border-indigo-500/30 rounded-xl p-2.5 flex flex-col justify-between gap-2 shadow transition-all">
+        <button onclick="toggleSessionHabit('/tuition', 'Tuition')" class="text-left w-full active:scale-[0.98] transition">
+          <div class="flex items-center justify-between">
+            <span class="text-base">📚</span>
+            <code class="text-[10px] text-indigo-400">/tuition</code>
+          </div>
+          <span class="block text-xs font-semibold text-white mt-1">Tuition Batch</span>
+          <span id="badge-/tuition" class="block text-[10px] text-slate-400 mt-0.5 leading-tight">Tap ▶ Start / End</span>
+        </button>
+        <button onclick="quickFinishHabit('/tuition', 'Finished Tuition', this)" class="w-full py-1 rounded-lg bg-indigo-500/15 hover:bg-indigo-500/25 active:scale-95 border border-indigo-500/30 text-indigo-300 text-[10px] font-semibold transition">
+          ✔ Done
+        </button>
+      </div>
+
+      <!-- Tile 2: Deep Work C++/IoT (/study) -->
+      <div id="card-/study" class="bg-slate-900 border border-cyan-500/30 rounded-xl p-2.5 flex flex-col justify-between gap-2 shadow transition-all">
+        <button onclick="toggleSessionHabit('/study', 'Deep Work')" class="text-left w-full active:scale-[0.98] transition">
+          <div class="flex items-center justify-between">
+            <span class="text-base">⚡</span>
+            <code class="text-[10px] text-cyan-400">/study</code>
+          </div>
+          <span class="block text-xs font-semibold text-white mt-1">C++ / IoT Work</span>
+          <span id="badge-/study" class="block text-[10px] text-slate-400 mt-0.5 leading-tight">Tap ▶ Start / End</span>
+        </button>
+        <button onclick="quickFinishHabit('/study', 'Finished Deep Work', this)" class="w-full py-1 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/25 active:scale-95 border border-cyan-500/30 text-cyan-300 text-[10px] font-semibold transition">
+          ✔ Done
+        </button>
+      </div>
+
+      <!-- Tile 3: College Classes (/college) -->
+      <div id="card-/college" class="bg-slate-900 border border-blue-500/30 rounded-xl p-2.5 flex flex-col justify-between gap-2 shadow transition-all">
+        <button onclick="toggleSessionHabit('/college', 'College')" class="text-left w-full active:scale-[0.98] transition">
+          <div class="flex items-center justify-between">
+            <span class="text-base">🏛️</span>
+            <code class="text-[10px] text-blue-400">/college</code>
+          </div>
+          <span class="block text-xs font-semibold text-white mt-1">College Classes</span>
+          <span id="badge-/college" class="block text-[10px] text-slate-400 mt-0.5 leading-tight">Tap ▶ Start / End</span>
+        </button>
+        <button onclick="quickFinishHabit('/college', 'Finished College', this)" class="w-full py-1 rounded-lg bg-blue-500/15 hover:bg-blue-500/25 active:scale-95 border border-blue-500/30 text-blue-300 text-[10px] font-semibold transition">
+          ✔ Done
+        </button>
+      </div>
+
+      <!-- Tile 4: College ECE Study (/college_study) -->
+      <div id="card-/college_study" class="bg-slate-900 border border-teal-500/30 rounded-xl p-2.5 flex flex-col justify-between gap-2 shadow transition-all">
+        <button onclick="toggleSessionHabit('/college_study', 'ECE Study')" class="text-left w-full active:scale-[0.98] transition">
+          <div class="flex items-center justify-between">
+            <span class="text-base">📐</span>
+            <code class="text-[10px] text-teal-400">/college_study</code>
+          </div>
+          <span class="block text-xs font-semibold text-white mt-1">College Study</span>
+          <span id="badge-/college_study" class="block text-[10px] text-slate-400 mt-0.5 leading-tight">Tap ▶ Start / End</span>
+        </button>
+        <button onclick="quickFinishHabit('/college_study', 'Finished ECE Study', this)" class="w-full py-1 rounded-lg bg-teal-500/15 hover:bg-teal-500/25 active:scale-95 border border-teal-500/30 text-teal-300 text-[10px] font-semibold transition">
+          ✔ Done
+        </button>
+      </div>
+
+      <!-- Tile 5: Poster Deployment (/poster) -->
+      <div id="card-/poster" class="bg-slate-900 border border-orange-500/30 rounded-xl p-2.5 flex flex-col justify-between gap-2 shadow transition-all">
+        <button onclick="toggleSessionHabit('/poster', 'Poster Run')" class="text-left w-full active:scale-[0.98] transition">
+          <div class="flex items-center justify-between">
+            <span class="text-base">📌</span>
+            <code class="text-[10px] text-orange-400">/poster</code>
+          </div>
+          <span class="block text-xs font-semibold text-white mt-1">Poster Ads</span>
+          <span id="badge-/poster" class="block text-[10px] text-slate-400 mt-0.5 leading-tight">Tap ▶ Start / End</span>
+        </button>
+        <button onclick="quickFinishHabit('/poster', 'Finished Poster Run', this)" class="w-full py-1 rounded-lg bg-orange-500/15 hover:bg-orange-500/25 active:scale-95 border border-orange-500/30 text-orange-300 text-[10px] font-semibold transition">
+          ✔ Done
+        </button>
+      </div>
+
+      <!-- Tile 6: Meditation / Exercise (/exercise) -->
+      <div id="card-/exercise" class="bg-slate-900 border border-rose-500/30 rounded-xl p-2.5 flex flex-col justify-between gap-2 shadow transition-all">
+        <button onclick="toggleSessionHabit('/exercise', 'Exercise')" class="text-left w-full active:scale-[0.98] transition">
+          <div class="flex items-center justify-between">
+            <span class="text-base">🧘</span>
+            <code class="text-[10px] text-rose-400">/exercise</code>
+          </div>
+          <span class="block text-xs font-semibold text-white mt-1">Meditation / Fit</span>
+          <span id="badge-/exercise" class="block text-[10px] text-slate-400 mt-0.5 leading-tight">Tap ▶ Start / End</span>
+        </button>
+        <button onclick="quickFinishHabit('/exercise', 'Finished Exercise', this)" class="w-full py-1 rounded-lg bg-rose-500/15 hover:bg-rose-500/25 active:scale-95 border border-rose-500/30 text-rose-300 text-[10px] font-semibold transition">
+          ✔ Done
+        </button>
+      </div>
+
+    </div>
+
+    <!-- 3. Displayable To-Do List + Mobile Phone Reminder Push -->
+    <section class="mt-2 pt-3 border-t border-slate-800/80">
+      <div class="flex items-center justify-between mb-2 gap-1">
+        <label class="text-xs font-semibold text-cyan-400 flex items-center gap-1">
+          <span>✅</span> To-Do List
+        </label>
+        <div class="flex items-center gap-1">
+          <button
+            onclick="sendPhoneReminder(this)"
+            class="text-[10px] bg-indigo-500/15 hover:bg-indigo-500/25 border border-indigo-500/30 text-indigo-300 px-2 py-1 rounded-lg font-medium transition"
+          >
+            🔔 Alert Phone
+          </button>
+          <button
+            onclick="askAiToPrioritizeTodos(this)"
+            class="text-[10px] bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/30 text-cyan-300 px-2 py-1 rounded-lg font-medium transition"
+          >
+            ⚡ AI Prioritize
+          </button>
+        </div>
+      </div>
+
+      <div class="flex gap-1.5 mb-2">
+        <input
+          id="todo-input"
+          type="text"
+          placeholder="Add a task so you don't forget..."
+          class="flex-1 bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+        />
+        <button
+          onclick="addTodoItem(this)"
+          class="bg-cyan-500 hover:bg-cyan-400 active:scale-95 text-slate-950 font-semibold text-xs px-3 py-1.5 rounded-lg transition"
+        >
+          + Add
+        </button>
+      </div>
+
+      <div id="todo-list-container" class="space-y-1.5 max-h-40 overflow-y-auto pr-0.5">
+        <p class="text-[11px] text-slate-500 py-1.5 text-center">Loading your tasks...</p>
+      </div>
+    </section>
+
+    <!-- 4. Problems, Daily Reflection & Excuses -->
+    <section class="mt-2 pt-3 border-t border-slate-800/80">
+      <div class="flex items-center justify-between mb-1.5">
+        <label for="reflection-input" class="text-xs font-semibold text-amber-400 flex items-center gap-1">
+          <span>🔥</span> Problems, Reflections & Excuses
+        </label>
+        <span class="text-[10px] text-slate-500">Saved for Sunday Audit</span>
+      </div>
+      <textarea
+        id="reflection-input"
+        rows="2"
+        placeholder="Stuck on a problem? Off track today? Tell your AI Analyst & Coach..."
+        class="w-full bg-slate-900/90 border border-slate-800 rounded-xl p-2.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500 transition resize-none"
+      ></textarea>
+      <button
+        id="submit-reflection-btn"
+        onclick="submitReflection(this)"
+        class="mt-1.5 w-full bg-amber-500 hover:bg-amber-400 active:scale-[0.99] text-slate-950 font-semibold text-xs py-2.5 px-4 rounded-xl shadow transition"
+      >
+        Get Solution & Save to Weekly Log
+      </button>
+
+      <!-- AI Coach Reply Card -->
+      <div
+        id="coach-reply-box"
+        class="hidden mt-2.5 rounded-xl bg-amber-950/30 border border-amber-500/40 p-3 text-xs text-amber-100 leading-relaxed whitespace-pre-line"
+      ></div>
+    </section>
+
+    <!-- 5. Multi-Week Memory, Mid-Week Pulse & Gmail Hub -->
+    <section class="mt-2 pt-3 border-t border-slate-800/80">
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-xs font-semibold text-emerald-400 flex items-center gap-1">
+          <span>📊</span> Weekly Trajectory & Gmail Hub
+        </span>
+        <span class="text-[10px] text-slate-500">YOUR_EMAIL@gmail.com</span>
+      </div>
+
+      <!-- Live Scoreboard Since Monday -->
+      <div id="week-scoreboard" class="grid grid-cols-5 gap-1 mb-2 text-center">
+        <div class="bg-slate-900 border border-slate-800 rounded-lg p-1.5">
+          <span id="stat-study" class="block text-xs font-bold text-cyan-400">0</span>
+          <span class="text-[9px] text-slate-400">C++/IoT</span>
+        </div>
+        <div class="bg-slate-900 border border-slate-800 rounded-lg p-1.5">
+          <span id="stat-tuition" class="block text-xs font-bold text-indigo-400">0</span>
+          <span class="text-[9px] text-slate-400">Tuitions</span>
+        </div>
+        <div class="bg-slate-900 border border-slate-800 rounded-lg p-1.5">
+          <span id="stat-meal" class="block text-xs font-bold text-emerald-400">0</span>
+          <span class="text-[9px] text-slate-400">Meals</span>
+        </div>
+        <div class="bg-slate-900 border border-slate-800 rounded-lg p-1.5">
+          <span id="stat-todo" class="block text-xs font-bold text-teal-400">0</span>
+          <span class="text-[9px] text-slate-400">To-Dos</span>
+        </div>
+        <div class="bg-slate-900 border border-slate-800 rounded-lg p-1.5">
+          <span id="stat-excuse" class="block text-xs font-bold text-amber-400">0</span>
+          <span class="text-[9px] text-slate-400">Excuses</span>
+        </div>
+      </div>
+
+      <!-- 3 Action Buttons: Past Sunday Report, Read-Only Mid-Week Check, Email to Gmail -->
+      <div class="grid grid-cols-3 gap-1.5">
+        <button
+          onclick="showSavedSundayReport()"
+          class="bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 text-[10px] font-semibold py-2 px-2 rounded-lg transition"
+        >
+          📜 Sunday Audit
+        </button>
+        <button
+          onclick="runMidWeekPulse(this)"
+          class="bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 text-[10px] font-semibold py-2 px-2 rounded-lg transition"
+        >
+          🩺 Mid-Week Pulse
+        </button>
+        <button
+          onclick="emailReportToGmail(this)"
+          class="bg-sky-500/15 hover:bg-sky-500/25 border border-sky-500/30 text-sky-300 text-[10px] font-semibold py-2 px-2 rounded-lg transition"
+        >
+          📧 Send Gmail
+        </button>
+      </div>
+
+      <div
+        id="weekly-report-box"
+        class="hidden mt-2.5 rounded-xl bg-slate-900/90 border border-emerald-500/30 p-3 text-xs text-slate-200 leading-relaxed whitespace-pre-line max-h-60 overflow-y-auto"
+      ></div>
+    </section>
+
+    <!-- 6. Today's Logged Timeline (12-Hour Format) -->
+    <section class="mt-2 pt-3 border-t border-slate-800/80">
+      <div class="flex items-center justify-between mb-1.5">
+        <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Today's Logged History (12-Hr IST)</span>
+        <button onclick="loadDashboard()" class="text-[10px] text-slate-400 hover:text-white">↻ Refresh</button>
+      </div>
+      <div id="today-logs-container" class="space-y-1 max-h-36 overflow-y-auto text-xs">
+        <p class="text-slate-500 text-center py-1.5 text-[11px]">Loading today's logs...</p>
+      </div>
+    </section>
+
+  </main>
+
+  <script>
+    let cachedPastSummaries = [];
+    let lastGeneratedReportText = '';
+
+    // 1. LIVE 12-HOUR CLOCK & STOPWATCH ENGINE
+    function updateClockAndTimers() {
+      const now = new Date();
+      document.getElementById('current-date').textContent = now.toLocaleDateString('en-IN', {
+        timeZone: 'Asia/Kolkata',
+        weekday: 'short',
+        day: 'numeric',
+        month: 'short',
+      });
+
+      document.getElementById('live-clock').textContent = now.toLocaleTimeString('en-IN', {
+        timeZone: 'Asia/Kolkata',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true,
+      }).toUpperCase();
+
+      renderActiveSessionBadges();
+    }
+
+    setInterval(updateClockAndTimers, 1000);
+
+    // 2. WEB AUDIO SYNTHESIZER
+    let soundEnabled = localStorage.getItem('habitSoundMuted') !== 'true';
+    let audioCtx = null;
+
+    function updateSoundButtonUI() {
+      const btn = document.getElementById('sound-toggle-btn');
+      if (btn) btn.textContent = soundEnabled ? '🔊 SFX' : '🔇 Mute';
+    }
+
+    function toggleSound() {
+      soundEnabled = !soundEnabled;
+      localStorage.setItem('habitSoundMuted', (!soundEnabled).toString());
+      updateSoundButtonUI();
+      if (soundEnabled) playSound('tap');
+    }
+
+    function playSound(type) {
+      if (navigator.vibrate) {
+        if (type === 'start') navigator.vibrate(40);
+        else if (type === 'end') navigator.vibrate([50, 40, 80]);
+        else navigator.vibrate(20);
+      }
+
+      if (!soundEnabled) return;
+
+      try {
+        if (!audioCtx) {
+          const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+          audioCtx = new AudioContextClass();
+        }
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+
+        const now = audioCtx.currentTime;
+
+        if (type === 'start') {
+          playTone(523.25, now, 0.09, 'sine', 0.12);
+          playTone(783.99, now + 0.09, 0.16, 'triangle', 0.15);
+        } else if (type === 'end') {
+          playTone(523.25, now, 0.08, 'triangle', 0.12);
+          playTone(659.25, now + 0.08, 0.08, 'triangle', 0.12);
+          playTone(1046.5, now + 0.16, 0.22, 'sine', 0.16);
+        } else if (type === 'ai') {
+          playTone(660, now, 0.07, 'sine', 0.1);
+          playTone(880, now + 0.1, 0.14, 'sine', 0.12);
+        } else if (type === 'error') {
+          playTone(220, now, 0.18, 'sawtooth', 0.08);
+        } else {
+          playTone(700, now, 0.06, 'sine', 0.1);
+        }
+      } catch (e) {
+        console.warn('Audio playback skipped:', e);
+      }
+    }
+
+    function playTone(freq, startTime, duration, waveType = 'sine', maxGain = 0.12) {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = waveType;
+      osc.frequency.setValueAtTime(freq, startTime);
+
+      gain.gain.setValueAtTime(0.001, startTime);
+      gain.gain.exponentialRampToValueAtTime(maxGain, startTime + 0.015);
+      gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(startTime);
+      osc.stop(startTime + duration);
+    }
+
+    // 3. 12-HOUR LATE TIME HELPER
+    function getSelectedCustomTime() {
+      const hr = document.getElementById('late-hour').value;
+      const min = document.getElementById('late-min').value || '00';
+      const ampm = document.getElementById('late-ampm').value || 'PM';
+
+      if (!hr) return { customTime24h: null, customTime12h: null };
+
+      let h24 = parseInt(hr, 10);
+      if (ampm === 'PM' && h24 < 12) h24 += 12;
+      if (ampm === 'AM' && h24 === 12) h24 = 0;
+
+      const customTime24h = `${String(h24).padStart(2, '0')}:${min}`;
+      const customTime12h = `${hr}:${min} ${ampm}`;
+      return { customTime24h, customTime12h };
+    }
+
+    function clearLateTime() {
+      document.getElementById('late-hour').value = '';
+      document.getElementById('late-min').value = '00';
+    }
+
+    // 4. SESSION STATE & LIVE STOPWATCH BADGES
+    function getActiveSessions() {
+      try {
+        return JSON.parse(localStorage.getItem('activeHabitSessions') || '{}');
+      } catch {
+        return {};
+      }
+    }
+
+    function saveActiveSessions(sessions) {
+      localStorage.setItem('activeHabitSessions', JSON.stringify(sessions));
+      renderActiveSessionBadges();
+    }
+
+    function renderActiveSessionBadges() {
+      const sessions = getActiveSessions();
+      const commands = ['/tuition', '/study', '/college', '/college_study', '/poster', '/exercise'];
+
+      commands.forEach((cmd) => {
+        const card = document.getElementById(`card-${cmd}`);
+        const badge = document.getElementById(`badge-${cmd}`);
+        if (!card || !badge) return;
+
+        if (sessions[cmd]) {
+          const startMs = sessions[cmd].startTime;
+          const elapsedSec = Math.max(0, Math.floor((Date.now() - startMs) / 1000));
+          const hrs = Math.floor(elapsedSec / 3600);
+          const mins = Math.floor((elapsedSec % 3600) / 60);
+          const secs = elapsedSec % 60;
+          const timerStr = hrs > 0 ? `${hrs}h ${mins}m ${secs}s` : `${mins}m ${secs}s`;
+
+          const startedAt12h = new Date(startMs).toLocaleTimeString('en-IN', {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true,
+          }).toUpperCase();
+
+          card.classList.add('ring-2', 'ring-emerald-500', 'active-session-glow');
+          badge.innerHTML = `<span class="text-emerald-400 font-semibold">🟢 ${timerStr} (${startedAt12h})</span>`;
+        } else {
+          card.classList.remove('ring-2', 'ring-emerald-500', 'active-session-glow');
+          badge.textContent = 'Tap ▶ Start / End';
+        }
+      });
+    }
+
+    function showStatus(message, type = 'info') {
+      const statusBox = document.getElementById('status-box');
+      if (type === 'success') {
+        statusBox.className = 'mt-2 min-h-[34px] rounded-lg bg-emerald-950/60 border border-emerald-500/40 px-2.5 py-1.5 flex items-center justify-center text-[11px] text-emerald-300 text-center font-medium';
+      } else if (type === 'error') {
+        statusBox.className = 'mt-2 min-h-[34px] rounded-lg bg-rose-950/60 border border-rose-500/40 px-2.5 py-1.5 flex items-center justify-center text-[11px] text-rose-300 text-center font-medium';
+      } else {
+        statusBox.className = 'mt-2 min-h-[34px] rounded-lg bg-slate-900 border border-slate-700 px-2.5 py-1.5 flex items-center justify-center text-[11px] text-slate-300 text-center';
+      }
+      statusBox.textContent = message;
+    }
+
+    function buildTelegramPayload(text) {
+      const { customTime24h, customTime12h } = getSelectedCustomTime();
+      return {
+        update_id: Date.now(),
+        customTime24h,
+        customTime12h,
+        message: {
+          message_id: Date.now(),
+          date: Math.floor(Date.now() / 1000),
+          chat: { id: 0, type: 'private' },
+          text,
+        },
+      };
+    }
+
+    async function triggerInstantHabit(command, label, btnEl) {
+      playSound('tap');
+      const noteInput = document.getElementById('habit-note');
+      const noteText = noteInput.value.trim();
+      const fullText = noteText ? `${command} ${noteText}` : command;
+
+      btnEl.disabled = true;
+      showStatus(`Logging "${label}"...`);
+
+      try {
+        const res = await fetch('/api/telegram', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(buildTelegramPayload(fullText)),
+        });
+        const result = await res.json();
+        if (!res.ok || !result.ok) throw new Error(result.error || 'Failed');
+
+        playSound('end');
+        showStatus(`✅ ${label} logged!`, 'success');
+        noteInput.value = '';
+        clearLateTime();
+        loadDashboard();
+      } catch (err) {
+        playSound('error');
+        showStatus(`❌ Error: ${err.message}`, 'error');
+      } finally {
+        btnEl.disabled = false;
+      }
+    }
+
+    async function toggleSessionHabit(command, label) {
+      const sessions = getActiveSessions();
+      const noteInput = document.getElementById('habit-note');
+      const userNote = noteInput.value.trim();
+
+      if (!sessions[command]) {
+        playSound('start');
+        sessions[command] = { startTime: Date.now() };
+        saveActiveSessions(sessions);
+
+        const startNote = userNote ? `[START] ${userNote}` : '[START] Session started';
+        showStatus(`▶ Started "${label}"...`);
+
+        await fetch('/api/telegram', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(buildTelegramPayload(`${command} ${startNote}`)),
+        });
+
+        noteInput.value = '';
+        clearLateTime();
+        showStatus(`🟢 "${label}" timer running! Tap tile again when finished.`, 'success');
+        loadDashboard();
+      } else {
+        playSound('end');
+        const elapsedMs = Date.now() - sessions[command].startTime;
+        const mins = Math.max(1, Math.round(elapsedMs / 60000));
+        const durationStr = mins >= 60 ? `${Math.floor(mins / 60)}h ${mins % 60}m` : `${mins}m`;
+
+        delete sessions[command];
+        saveActiveSessions(sessions);
+
+        const endNote = userNote
+          ? `[END - Duration: ${durationStr}] ${userNote}`
+          : `[END - Duration: ${durationStr}]`;
+        showStatus(`⏹ Ending "${label}" (${durationStr})...`);
+
+        await fetch('/api/telegram', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(buildTelegramPayload(`${command} ${endNote}`)),
+        });
+
+        noteInput.value = '';
+        clearLateTime();
+        showStatus(`✅ Finished "${label}" (${durationStr})`, 'success');
+        loadDashboard();
+      }
+    }
+
+    async function quickFinishHabit(command, label, btnEl) {
+      playSound('end');
+      const sessions = getActiveSessions();
+      if (sessions[command]) {
+        delete sessions[command];
+        saveActiveSessions(sessions);
+      }
+
+      const noteInput = document.getElementById('habit-note');
+      const noteText = noteInput.value.trim();
+      const fullText = noteText ? `${command} [COMPLETED] ${noteText}` : `${command} [COMPLETED]`;
+
+      btnEl.disabled = true;
+      showStatus(`Logging "${label}"...`);
+
+      try {
+        const res = await fetch('/api/telegram', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(buildTelegramPayload(fullText)),
+        });
+        const result = await res.json();
+        if (!res.ok || !result.ok) throw new Error(result.error || 'Failed');
+
+        noteInput.value = '';
+        clearLateTime();
+        showStatus(`✅ ${label} logged!`, 'success');
+        loadDashboard();
+      } catch (err) {
+        playSound('error');
+        showStatus(`❌ Error: ${err.message}`, 'error');
+      } finally {
+        btnEl.disabled = false;
+      }
+    }
+
+    async function smartAiLog(btnEl) {
+      const noteInput = document.getElementById('habit-note');
+      const text = noteInput.value.trim();
+      if (!text) {
+        playSound('error');
+        showStatus('⚠️ Type what you did (e.g. "Tuition ended at 8:15 pm") first.', 'error');
+        return;
+      }
+
+      playSound('tap');
+      btnEl.disabled = true;
+      btnEl.textContent = '⏳...';
+      showStatus('✨ Gemini is parsing your 12-hour AM/PM note...');
+
+      try {
+        const res = await fetch('/api/telegram', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'smart_log', text }),
+        });
+        const result = await res.json();
+        if (!res.ok || !result.ok) throw new Error(result.error || 'Failed to auto-log');
+
+        playSound('end');
+        noteInput.value = '';
+        showStatus(`✨ ${result.summary}`, 'success');
+        loadDashboard();
+      } catch (err) {
+        playSound('error');
+        showStatus(`❌ Error: ${err.message}`, 'error');
+      } finally {
+        btnEl.disabled = false;
+        btnEl.textContent = '✨ AI Log';
+      }
+    }
+
+    async function addTodoItem(btnEl) {
+      const input = document.getElementById('todo-input');
+      const text = input.value.trim();
+      if (!text) return;
+
+      playSound('tap');
+      btnEl.disabled = true;
+      try {
+        await fetch('/api/telegram', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'add_todo', text }),
+        });
+        input.value = '';
+        showStatus('📌 Added to your To-Do list!', 'success');
+        loadDashboard();
+      } finally {
+        btnEl.disabled = false;
+      }
+    }
+
+    async function toggleTodoItem(id, currentStatus, notes) {
+      playSound(currentStatus === 'todo_pending' ? 'end' : 'tap');
+      await fetch('/api/telegram', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'toggle_todo', id, currentStatus, notes }),
+      });
+      loadDashboard();
+    }
+
+    async function deleteTodoItem(id) {
+      playSound('tap');
+      await fetch('/api/telegram', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'delete_todo', id }),
+      });
+      loadDashboard();
+    }
+
+    async function sendPhoneReminder(btnEl) {
+      playSound('tap');
+      btnEl.disabled = true;
+      btnEl.textContent = 'Sending...';
+      showStatus('📲 Sending pending To-Dos & missed logs to your phone...');
+
+      try {
+        const res = await fetch('/api/telegram', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'send_mobile_reminder' }),
+        });
+        const result = await res.json();
+        playSound('ai');
+        showStatus(`🔔 ${result.message || 'Sent to Telegram!'}`, 'success');
+      } catch (err) {
+        playSound('error');
+        showStatus(`❌ Error: ${err.message}`, 'error');
+      } finally {
+        btnEl.disabled = false;
+        btnEl.textContent = '🔔 Alert Phone';
+      }
+    }
+
+    async function askAiToPrioritizeTodos(btnEl) {
+      playSound('tap');
+      const coachBox = document.getElementById('coach-reply-box');
+      btnEl.disabled = true;
+      btnEl.textContent = 'Thinking...';
+      showStatus('⚡ Gemini is prioritizing your To-Do list...');
+
+      try {
+        const res = await fetch('/api/telegram', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'ai_prioritize_todos' }),
+        });
+        const result = await res.json();
+        if (result.coachReply) {
+          playSound('ai');
+          coachBox.classList.remove('hidden');
+          coachBox.textContent = `⚡ AI Task Prioritizer:\n${result.coachReply}`;
+        }
+        showStatus('✅ AI Task plan ready below!', 'success');
+      } finally {
+        btnEl.disabled = false;
+        btnEl.textContent = '⚡ AI Prioritize';
+      }
+    }
+
+    async function submitReflection(btnEl) {
+      const reflectionInput = document.getElementById('reflection-input');
+      const coachReplyBox = document.getElementById('coach-reply-box');
+      const rawReflection = reflectionInput.value.trim().replace(/^\/+/, '');
+
+      if (!rawReflection) {
+        playSound('error');
+        showStatus('⚠️ Write your problem, reflection, or excuse first.', 'error');
+        return;
+      }
+
+      playSound('tap');
+      btnEl.disabled = true;
+      btnEl.textContent = 'Consulting AI Analyst...';
+      showStatus('Saving reflection & generating solution...');
+
+      try {
+        const res = await fetch('/api/telegram', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(buildTelegramPayload(rawReflection)),
+        });
+        const result = await res.json();
+        if (!res.ok || !result.ok) throw new Error(result.error || 'Failed');
+
+        if (result.coachReply) {
+          playSound('ai');
+          coachReplyBox.classList.remove('hidden');
+          coachReplyBox.textContent = `🔥 AI Analyst & Coach:\n${result.coachReply}`;
+        }
+        showStatus('✅ Saved for Sunday Audit & solution ready below.', 'success');
+        reflectionInput.value = '';
+        loadDashboard();
+      } catch (err) {
+        playSound('error');
+        showStatus(`❌ Error: ${err.message}`, 'error');
+      } finally {
+        btnEl.disabled = false;
+        btnEl.textContent = 'Get Solution & Save to Weekly Log';
+      }
+    }
+
+    // WEEKLY HUB FUNCTIONS (Saved Sunday Audits vs Read-Only Mid-Week Check vs Gmail)
+    function showSavedSundayReport() {
+      playSound('tap');
+      const box = document.getElementById('weekly-report-box');
+      box.classList.remove('hidden');
+
+      if (!cachedPastSummaries || cachedPastSummaries.length === 0) {
+        box.textContent =
+          '📜 No Official Sunday Audit saved yet.\n\nYour first official 7-day audit will be saved automatically this Sunday at 8:00 AM IST (or tap "🩺 Mid-Week Pulse" for a read-only check right now without corrupting your weekly history).';
+        return;
+      }
+
+      const formatted = cachedPastSummaries
+        .map((s, i) => {
+          const d = new Date(s.created_at).toLocaleDateString('en-IN', {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric',
+          });
+          return `=== 📜 Official Sunday Audit #${i + 1} (${d}) ===\n${s.notes}`;
+        })
+        .join('\n\n------------------------\n\n');
+
+      lastGeneratedReportText = cachedPastSummaries[0].notes;
+      box.textContent = formatted;
+      showStatus('✅ Showing saved official Sunday audits.', 'success');
+    }
+
+    async function runMidWeekPulse(btnEl) {
+      playSound('tap');
+      const box = document.getElementById('weekly-report-box');
+      btnEl.disabled = true;
+      btnEl.textContent = 'Checking...';
+      showStatus('🩺 Running read-only Mid-Week Trajectory Check...');
+
+      try {
+        const res = await fetch('/api/telegram', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'midweek_check' }),
+        });
+        const data = await res.json();
+        if (data.reportText) {
+          playSound('ai');
+          lastGeneratedReportText = data.reportText;
+          box.classList.remove('hidden');
+          box.textContent = `🩺 Read-Only Mid-Week Pulse (Does NOT overwrite Sunday history):\n\n${data.reportText}`;
+          showStatus('✅ Mid-Week Pulse ready!', 'success');
+        }
+      } catch (err) {
+        playSound('error');
+        showStatus(`❌ Error: ${err.message}`, 'error');
+      } finally {
+        btnEl.disabled = false;
+        btnEl.textContent = '🩺 Mid-Week Pulse';
+      }
+    }
+
+    async function emailReportToGmail(btnEl) {
+      playSound('tap');
+      btnEl.disabled = true;
+      btnEl.textContent = 'Emailing...';
+      showStatus('📧 Sending report to YOUR_EMAIL@gmail.com...');
+
+      try {
+        const res = await fetch('/api/telegram', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'email_report',
+            reportText: lastGeneratedReportText || null,
+          }),
+        });
+        const data = await res.json();
+        playSound('end');
+        showStatus(data.emailResult || '✅ Email action completed', 'success');
+      } catch (err) {
+        playSound('error');
+        showStatus(`❌ Error: ${err.message}`, 'error');
+      } finally {
+        btnEl.disabled = false;
+        btnEl.textContent = '📧 Send Gmail';
+      }
+    }
+
+    async function loadDashboard() {
+      try {
+        const res = await fetch('/api/telegram');
+        const data = await res.json();
+        if (!data.ok) return;
+
+        cachedPastSummaries = data.pastSummaries || [];
+
+        if (data.weekStats) {
+          document.getElementById('stat-study').textContent = data.weekStats.study || 0;
+          document.getElementById('stat-tuition').textContent = data.weekStats.tuition || 0;
+          document.getElementById('stat-meal').textContent = data.weekStats.meal || 0;
+          document.getElementById('stat-todo').textContent = data.weekStats.todo_done || 0;
+          document.getElementById('stat-excuse').textContent = data.weekStats.reflection || 0;
+        }
+
+        const todoContainer = document.getElementById('todo-list-container');
+        if (!data.todos || data.todos.length === 0) {
+          todoContainer.innerHTML = '<p class="text-[11px] text-slate-500 py-1.5 text-center">No pending tasks. Add one above!</p>';
+        } else {
+          todoContainer.innerHTML = data.todos
+            .map((t) => {
+              const isDone = t.event_type === 'todo_done';
+              const safeNotes = (t.notes || '').replace(/'/g, "\\'");
+              return `
+                <div class="flex items-center justify-between bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5">
+                  <button onclick="toggleTodoItem('${t.id}', '${t.event_type}', '${safeNotes}')" class="flex items-center gap-2 text-left flex-1">
+                    <span class="text-xs">${isDone ? '☑️' : '⬜'}</span>
+                    <span class="text-xs ${isDone ? 'line-through text-slate-500' : 'text-slate-200'}">${t.notes || ''}</span>
+                  </button>
+                  <button onclick="deleteTodoItem('${t.id}')" class="text-slate-500 hover:text-rose-400 text-xs px-1">✕</button>
+                </div>
+              `;
+            })
+            .join('');
+        }
+
+        const logsContainer = document.getElementById('today-logs-container');
+        if (!data.todayLogs || data.todayLogs.length === 0) {
+          logsContainer.innerHTML = '<p class="text-slate-500 text-center py-1.5 text-[11px]">No logs recorded yet today.</p>';
+        } else {
+          logsContainer.innerHTML = data.todayLogs
+            .map((l) => {
+              const time12h = new Date(l.created_at).toLocaleTimeString('en-IN', {
+                timeZone: 'Asia/Kolkata',
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: true,
+              }).toUpperCase();
+              return `
+                <div class="flex items-center justify-between bg-slate-900/60 border border-slate-800/60 rounded-lg px-2.5 py-1">
+                  <span class="font-semibold text-indigo-300 uppercase text-[10px]">${l.event_type}</span>
+                  <span class="text-slate-300 truncate max-w-[155px] text-[10px]">${l.notes || '—'}</span>
+                  <span class="text-emerald-400/90 font-mono text-[10px] whitespace-nowrap">${time12h}</span>
+                </div>
+              `;
+            })
+            .join('');
+        }
+      } catch (err) {
+        console.error('Dashboard load error:', err);
+      }
+    }
+
+    updateSoundButtonUI();
+    updateClockAndTimers();
+    loadDashboard();
+  </script>
+<script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch(err => console.log('SW registration failed:', err));
+      });
+    }
+  </script>
+</body>
+</html>
